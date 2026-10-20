@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: codesea-server
+    runtime: node
+    plan: free
+    branch: master
+    buildCommand: npm run check
+    startCommand: npm start
+    healthCheckPath: /healthz
