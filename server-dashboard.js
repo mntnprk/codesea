@@ -1,6 +1,7 @@
+(() => {
 'use strict';
 const status = document.querySelector('#server-status');
-const cards = document.querySelector('#cards');
+const cards = document.querySelector('#server-cards');
 const mib = value => value == null ? '확인 불가' : (value / 1048576).toFixed(1) + ' MiB';
 function render(data, rtt) {
   const groups = {
@@ -35,3 +36,5 @@ async function poll() {
   setTimeout(poll,1000);
 }
 poll();
+
+})();
