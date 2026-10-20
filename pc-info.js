@@ -98,3 +98,64 @@ document.querySelector('#download').addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 collect();
+
+function startWorkerClock() {
+  const panel = document.createElement('section');
+  const heading = document.createElement('h2');
+  heading.textContent = 'Web Worker 타이머 · 100 ms';
+  const clock = document.createElement('p');
+  const timing = document.createElement('p');
+  const note = document.createElement('p');
+  note.textContent = '접속한 PC의 현지 시간입니다. 백그라운드 탭이나 절전 상태에서는 갱신이 지연될 수 있습니다.';
+  panel.append(heading, clock, timing, note);
+  document.querySelector('header').after(panel);
+  if (!window.Worker) {
+    clock.textContent = '이 브라우저는 Web Worker를 지원하지 않습니다.';
+    return;
+  }
+  const workerSource = `
+    let count = 0;
+    setInterval(() => {
+      self.postMessage({ count: ++count, sentAt: Date.now() });
+    }, 100);
+  `;
+  const workerURL = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
+  let worker;
+  let previous = null;
+  let received = 0;
+  const pad = (value, length = 2) => String(value).padStart(length, '0');
+  try {
+    worker = new Worker(workerURL);
+    // Worker는 신호를 보내고, 메인 스레드의 message handler에서 시간을 표시합니다.
+    worker.onmessage = (event) => {
+      URL.revokeObjectURL(workerURL);
+      const now = new Date();
+      const arrived = performance.now();
+      const interval = previous === null ? '—' : (arrived - previous).toFixed(1) + ' ms';
+      previous = arrived;
+      received += 1;
+      clock.textContent = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate())
+        + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds())
+        + '.' + pad(now.getMilliseconds(), 3);
+      timing.textContent = '핸들러 수신: ' + received + '회 · 실제 수신 간격: ' + interval
+        + ' · 설정 주기: 100 ms';
+    };
+    worker.onerror = () => {
+      URL.revokeObjectURL(workerURL);
+      worker.terminate();
+      clock.textContent = 'Web Worker 타이머를 시작할 수 없습니다. 브라우저 설정을 확인하세요.';
+    };
+    window.addEventListener('pagehide', () => {
+      worker.terminate();
+      URL.revokeObjectURL(workerURL);
+    }, { once: true });
+    // 뒤로 가기 캐시에서 복원되면 종료된 Worker 대신 새로 시작합니다.
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) { panel.remove(); startWorkerClock(); }
+    }, { once: true });
+  } catch {
+    URL.revokeObjectURL(workerURL);
+    clock.textContent = 'Web Worker 타이머를 시작할 수 없습니다.';
+  }
+}
+startWorkerClock();
